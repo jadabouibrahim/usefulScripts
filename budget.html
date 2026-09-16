@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Flow Budget Simulator</title>
+  <style>
+    :root { color-scheme: light; --primary: #2563eb; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 28px; background: #f4f7fb; color: var(--text); font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    button, input, select { font: inherit; }
+    button, select, input[type="range"] { cursor: pointer; }
+    button { border: 1px solid var(--border); border-radius: 8px; padding: 9px 14px; background: white; color: var(--text); font-weight: 600; }
+    button:hover { background: #f1f5f9; border-color: #94a3b8; }
+    :focus-visible { outline: 3px solid #2563eb; outline-offset: 4px; }
+    .container { max-width: 1260px; margin: auto; padding: 30px; border: 1px solid var(--border); border-radius: 18px; background: white; box-shadow: 0 8px 32px #0f172a06; }
+    .header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+    .eyebrow { margin: 0 0 5px; color: var(--primary); font-size: 11px; font-weight: 750; letter-spacing: 1.5px; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(23px, 3vw, 30px); letter-spacing: -0.8px; line-height: 1.25; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); }
+    .currency-card { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 18px; padding: 18px; background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 24px; }
+    .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .field label { font-size: 12px; font-weight: 650; }
+    .field input, .field select { min-width: 0; width: 100%; height: 40px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 7px; background: white; color: var(--text); }
+    .field small { color: var(--muted); font-size: 11px; }
+    [aria-invalid="true"] { border-color: #dc2626 !important; background: #fff7f7 !important; }
+    .field .error, .input-error { color: #b91c1c; }
+    .grid { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 26px; }
+    h2 { margin: 0; font-size: 16px; letter-spacing: -0.2px; }
+    .section-note { margin: 4px 0 18px; color: var(--muted); font-size: 12px; }
+    .controls { min-width: 0; }
+    .form-group { margin-bottom: 17px; padding: 0 0 15px; border-bottom: 1px solid #edf1f6; border-radius: 4px; }
+    .form-group:last-child { margin-bottom: 0; border-bottom: 0; }
+    .form-group.selected { box-shadow: 0 0 0 5px #eff6ff; background: #eff6ff; }
+    .control-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .control-head label { font-weight: 600; font-size: 12px; }
+    .swatch { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: var(--category); }
+    .amount { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
+    .amount input { width: 80px; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--text); background: white; }
+    .val { display: block; margin: 6px 0; color: var(--muted); font-size: 12px; min-height: 18px; overflow-wrap: anywhere; }
+    input[type="range"] { display: block; width: 100%; height: 18px; margin: 0; accent-color: var(--category, var(--primary)); }
+    .input-error { display: block; font-size: 11px; margin-top: 4px; }
+    .viz-panel { min-width: 0; }
+    .chart-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 650; background: #ecfdf5; color: #047857; }
+    .badge.deficit { background: #fef2f2; color: #b91c1c; }
+    .badge.balanced { background: #eff6ff; color: #1d4ed8; }
+    .sankey-container { overflow-x: auto; width: 100%; border: 1px solid var(--border); border-radius: 12px; background: #fbfcfe; }
+    #sankeySvg { display: block; width: 100%; min-width: 640px; height: auto; aspect-ratio: 840 / 490; }
+    .link { fill-opacity: 0.38; transition: fill-opacity 130ms; pointer-events: all; }
+    .node, .link { cursor: pointer; }
+    .node { transition: opacity 130ms; }
+    .link.active { fill-opacity: 0.77; }
+    .link.dimmed { fill-opacity: 0.07; }
+    .node.dimmed { opacity: 0.35; }
+    .node:focus { outline: none; }
+    .node:focus-visible .node-hit { stroke: #2563eb; stroke-width: 2; }
+    .chart-hint { margin: 10px 0; color: var(--muted); font-size: 11px; }
+    .flow-detail { min-height: 52px; padding: 11px 13px; background: #f1f5f9; border-radius: 8px; font-size: 12px; color: #475569; }
+    .flow-detail strong { color: var(--text); }
+    .metrics { display: grid; grid-template-columns: 1fr 0.65fr 1fr; gap: 12px; margin-top: 16px; }
+    .metric { padding: 14px; border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
+    .metric-label { display: block; color: var(--muted); font-size: 11px; margin-bottom: 5px; }
+    .metric-value { display: block; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+    .metric.savings { background: #f0fdf4; border-color: #bbf7d0; }
+    .metric.savings.negative { background: #fef2f2; border-color: #fecaca; }
+    .savings-pos { color: #15803d; }
+    .savings-neg { color: #b91c1c; }
+    .tooltip { position: fixed; z-index: 10; max-width: min(300px, calc(100vw - 24px)); padding: 10px 13px; border-radius: 8px; background: #0f172a; color: white; box-shadow: 0 5px 20px #0f172a22; font-size: 12px; pointer-events: none; white-space: pre-line; }
+    [hidden] { display: none !important; }
+    @media (max-width: 1020px) { .grid { grid-template-columns: 1fr; } .control-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; } }
+    @media (max-width: 600px) { body { padding: 12px; } .container { padding: 18px; border-radius: 12px; } .header { align-items: flex-start; } .header button { font-size: 11px; padding: 8px; flex-shrink: 0; } .currency-card { grid-template-columns: 1fr; gap: 12px; padding: 14px; } .control-list { grid-template-columns: 1fr; } .metrics { grid-template-columns: 1fr; gap: 8px; } .metric { display: flex; justify-content: space-between; align-items: baseline; gap: 15px; } .metric-label { margin: 0; } .metric-value { font-size: 14px; text-align: right; } }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <div>
+        <p class="eyebrow">Monthly budget</p>
+        <h1>Interactive Flow Budget Simulator</h1>
+        <p class="subtitle">Adjust your budget and see where every dollar goes.</p>
+      </div>
+      <button type="button" id="resetBudget">Reset</button>
+    </header>
+    <section class="currency-card" aria-label="Currency settings">
+      <div class="field">
+        <label for="currCode">Secondary currency</label>
+        <input type="text" id="currCode" value="LBP" maxlength="6" placeholder="e.g. QAR, EUR, LBP" autocomplete="off" spellcheck="false" aria-describedby="codeHelp">
+        <small id="codeHelp">Use 3–6 letters for the currency label.</small>
+      </div>
+      <div class="field">
+        <label for="currRate">Exchange rate · 1 USD =</label>
+        <input type="number" id="currRate" value="89000" step="any" min="0.0001" max="1000000" aria-describedby="rateHelp">
+        <small id="rateHelp">Set manually; changes update instantly.</small>
+      </div>
+      <div class="field">
+        <label for="currMode">Display mode</label>
+        <select id="currMode">
+          <option value="dual">USD + secondary currency</option>
+          <option value="usd">USD only</option>
+          <option value="sec">Secondary currency only</option>
+        </select>
+        <small>Budget inputs always use USD.</small>
+      </div>
+    </section>
+    <div class="grid">
+      <section class="controls" aria-labelledby="controlsTitle">
+        <h2 id="controlsTitle">Your monthly amounts</h2>
+        <p class="section-note">Drag a slider or enter an amount in USD.</p>
+        <div class="control-list" id="controlList"></div>
+      </section>
+      <section class="viz-panel" aria-labelledby="chartHeading">
+        <div class="chart-heading"><h2 id="chartHeading">Income → allocation</h2><span id="budgetStatus" class="badge">Updating…</span></div>
+        <div class="sankey-container" tabindex="0" role="region" aria-label="Budget flow chart. Scroll horizontally on a small screen.">
+          <svg id="sankeySvg" viewBox="0 0 840 490" role="group" aria-labelledby="svgTitle svgDesc"></svg>
+        </div>
+        <p class="chart-hint">Hover for details · tap a category to pin it · Escape to clear · scroll chart on small screens</p>
+        <div id="flowDetail" class="flow-detail" role="status" aria-live="polite" aria-atomic="true"></div>
+        <div class="metrics" aria-label="Budget totals">
+          <div class="metric"><span class="metric-label">Monthly expenses</span><output class="metric-value" id="totalExpenses"></output></div>
+          <div class="metric"><span class="metric-label">Savings rate</span><output class="metric-value" id="savingsRate"></output></div>
+          <div class="metric savings" id="savingsCard"><span class="metric-label">Net monthly savings</span><output class="metric-value savings-pos" id="monthlySavings"></output></div>
+        </div>
+      </section>
+    </div>
+    <noscript><p>Enable JavaScript in your browser to use the interactive budget chart.</p></noscript>
+  </main>
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+  <script>
+    'use strict';
+    (() => {
+      const fields = [
+        { id: 'salary', label: 'Monthly net income', name: 'Income', value: 0, max: 8000, color: '#10b981' },
+        { id: 'housing', label: 'Housing rent', name: 'Housing', value: 1250, max: 4000, color: '#3b82f6' },
+        { id: 'utilities', label: 'Utilities & internet', name: 'Utilities', value: 165, max: 600, color: '#06b6d4' },
+        { id: 'food', label: 'Groceries & food', name: 'Food', value: 410, max: 1500, color: '#f59e0b' },
+        { id: 'transport', label: 'Transportation', name: 'Transport', value: 140, max: 800, color: '#8b5cf6' },
+        { id: 'leisure', label: 'Leisure & misc.', name: 'Leisure', value: 275, max: 10000, color: '#ec4899' }
+      ];
+      const elements = {};
+      const values = Object.fromEntries(fields.map(item => [item.id, item.value]));
+      const currency = { code: 'LBP', rate: 89000, mode: 'dual' };
+      const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+      const svgNS = 'http://www.w3.org/2000/svg';
+      let selected = null;
+      let hovered = null;
+      let details = {};
+      let defaultDetail = '';
+      ['currCode', 'currRate', 'currMode', 'sankeySvg', 'flowDetail', 'tooltip', 'totalExpenses', 'savingsRate', 'monthlySavings', 'savingsCard', 'budgetStatus'].forEach(id => { elements[id] = document.getElementById(id); });
+
+      // Register the value labels as well as the inputs before the first render.
+      const controlList = document.getElementById('controlList');
+      fields.forEach(field => {
+        const group = document.createElement('div');
+        group.className = 'form-group';
+        group.id = field.id + 'Group';
+        group.style.setProperty('--category', field.color);
+        group.innerHTML = `<div class="control-head"><label for="${field.id}Amount"><span class="swatch" aria-hidden="true"></span>${field.label}</label><span class="amount"><input type="number" id="${field.id}Amount" min="0" max="${field.max}" step="1" value="${field.value}" aria-label="${field.label} in USD" aria-describedby="${field.id}Error"><span>USD</span></span></div><output id="${field.id}Val" class="val" for="${field.id} ${field.id}Amount"></output><input type="range" id="${field.id}" min="0" max="${field.max}" step="1" value="${field.value}" aria-label="${field.label} in USD"><small class="input-error" id="${field.id}Error" hidden></small>`;
+        controlList.appendChild(group);
+        ['', 'Amount', 'Val', 'Error', 'Group'].forEach(suffix => { elements[field.id + suffix] = document.getElementById(field.id + suffix); });
+        const slider = elements[field.id];
+        const amount = elements[field.id + 'Amount'];
+        const error = elements[field.id + 'Error'];
+        const clearError = () => { amount.removeAttribute('aria-invalid'); error.hidden = true; };
+        slider.addEventListener('input', () => {
+          values[field.id] = slider.valueAsNumber;
+          amount.value = slider.value;
+          clearError();
+          renderSankey();
+        });
+        amount.addEventListener('input', () => {
+          const next = amount.valueAsNumber;
+          if (!Number.isFinite(next) || !Number.isInteger(next) || next < 0 || next > field.max) {
+            amount.setAttribute('aria-invalid', 'true');
+            error.textContent = `Enter a whole number from 0 to ${number.format(field.max)}. Using ${number.format(values[field.id])} USD until corrected.`;
+            error.hidden = false;
+            return;
+          }
+          values[field.id] = next;
+          slider.value = next;
+          clearError();
+          renderSankey();
+        });
+      });
+
+      function currencyLines(value) {
+        const usd = (value < 0 ? '−$' : '$') + number.format(Math.abs(value));
+        const secondary = (value < 0 ? '−' : '') + number.format(Math.abs(value * currency.rate)) + ' ' + currency.code;
+        if (currency.mode === 'usd') return [usd];
+        if (currency.mode === 'sec') return [secondary];
+        return [usd, secondary];
+      }
+      function formatCurrency(value) { return currencyLines(value).join(' / '); }
+      function svgElement(tag, attributes = {}, text) {
+        const element = document.createElementNS(svgNS, tag);
+        Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
+        if (text !== undefined) element.textContent = text;
+        return element;
+      }
+      function percentage(value, total) { return total > 0 ? (100 * value / total).toFixed(1) + '%' : '—'; }
+
+      // Hover, keyboard focus, and pinned selections share the same highlights.
+      function highlight() {
+        const active = hovered || selected;
+        elements.sankeySvg.querySelectorAll('[data-category]').forEach(node => {
+          const match = !active || node.dataset.category === active || node.dataset.source === active;
+          node.classList.toggle('dimmed', !match);
+          node.classList.toggle('active', Boolean(active && match));
+          if (node.getAttribute('role') === 'button') node.setAttribute('aria-pressed', String(node.dataset.category === selected));
+        });
+        fields.forEach(field => elements[field.id + 'Group'].classList.toggle('selected', active === field.id));
+        elements.flowDetail.textContent = active && details[active] ? details[active] : defaultDetail;
+      }
+      function clearHover() { hovered = null; elements.tooltip.hidden = true; highlight(); }
+      function moveTooltip(event) {
+        const tooltip = elements.tooltip;
+        const x = Math.max(12, Math.min(event.clientX + 14, window.innerWidth - tooltip.offsetWidth - 12));
+        const y = Math.max(12, Math.min(event.clientY + 16, window.innerHeight - tooltip.offsetHeight - 12));
+        tooltip.style.left = x + 'px';
+        tooltip.style.top = y + 'px';
+      }
+      function interactive(node, id, text, keyboard = false) {
+        node.appendChild(svgElement('title', {}, text));
+        node.addEventListener('pointerenter', event => {
+          if (event.pointerType === 'touch') return;
+          hovered = id;
+          elements.tooltip.textContent = text;
+          elements.tooltip.hidden = false;
+          moveTooltip(event);
+          highlight();
+        });
+        node.addEventListener('pointermove', moveTooltip);
+        node.addEventListener('pointerleave', clearHover);
+        const toggle = () => { selected = selected === id ? null : id; hovered = null; elements.tooltip.hidden = true; highlight(); };
+        node.addEventListener('click', toggle);
+        if (keyboard) {
+          node.setAttribute('tabindex', '0');
+          node.setAttribute('role', 'button');
+          node.setAttribute('aria-label', text + '. Press Enter to pin or unpin.');
+          node.addEventListener('focus', () => { hovered = id; highlight(); });
+          node.addEventListener('blur', clearHover);
+          node.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); }
+          });
+        }
+      }
+
+      function renderSankey() {
+        hovered = null;
+        elements.tooltip.hidden = true;
+        const salary = values.salary;
+        const expenses = fields.slice(1).reduce((sum, field) => sum + values[field.id], 0);
+        const savings = salary - expenses;
+        const deficit = Math.max(0, -savings);
+        const totalFlow = Math.max(salary, expenses);
+        fields.forEach(field => {
+          elements[field.id + 'Val'].textContent = formatCurrency(values[field.id]);
+          elements[field.id].setAttribute('aria-valuetext', formatCurrency(values[field.id]));
+        });
+        elements.totalExpenses.textContent = formatCurrency(expenses);
+        elements.savingsRate.textContent = percentage(savings, salary);
+        elements.savingsRate.title = salary > 0 ? 'Net savings divided by income.' : 'Savings rate is undefined with zero income.';
+        elements.monthlySavings.textContent = formatCurrency(savings);
+        elements.monthlySavings.className = 'metric-value ' + (savings < 0 ? 'savings-neg' : 'savings-pos');
+        elements.savingsCard.classList.toggle('negative', savings < 0);
+        elements.budgetStatus.textContent = savings > 0 ? 'Within income' : savings < 0 ? 'Over budget' : totalFlow ? 'Balanced' : 'No amounts yet';
+        elements.budgetStatus.className = 'badge ' + (savings < 0 ? 'deficit' : savings === 0 ? 'balanced' : '');
+        defaultDetail = deficit > 0
+          ? `Expenses exceed income by ${formatCurrency(deficit)}. The red funding gap shows the extra amount needed, spread proportionally across expenses for illustration.`
+          : totalFlow > 0 ? `Every flow uses the same scale. ${formatCurrency(Math.max(0, savings))} remains after monthly expenses. Select a category to explore.`
+          : 'Enter an income or expense above zero to see your budget flow.';
+
+        const items = fields.slice(1).map(field => ({ ...field, value: values[field.id] })).filter(item => item.value > 0);
+        if (savings > 0) items.push({ id: 'savings', name: 'Savings', value: savings, color: '#22c55e' });
+        const sources = [];
+        if (salary > 0) sources.push({ id: 'salary', name: 'Income', value: salary, color: '#10b981' });
+        if (deficit > 0) sources.push({ id: 'deficit', name: 'Funding gap', value: deficit, color: '#ef4444' });
+        details = {};
+        items.forEach(item => { details[item.id] = `${item.name}: ${formatCurrency(item.value)} · ${salary > 0 ? percentage(item.value, salary) + ' of income.' : 'Income is zero.'}`; });
+        sources.forEach(source => { details[source.id] = `${source.name}: ${formatCurrency(source.value)}${source.id === 'deficit' ? ' of additional funding needed.' : ' available each month.'}`; });
+        if (!details[selected]) selected = null;
+        const svg = elements.sankeySvg;
+        svg.replaceChildren();
+        svg.appendChild(svgElement('title', { id: 'svgTitle' }, 'Monthly budget flow'));
+        svg.appendChild(svgElement('desc', { id: 'svgDesc' }, `Income ${formatCurrency(salary)}. Expenses ${formatCurrency(expenses)}. Net savings ${formatCurrency(savings)}. ${defaultDetail}`));
+        if (totalFlow === 0) {
+          svg.appendChild(svgElement('text', { x: 420, y: 245, 'text-anchor': 'middle', fill: '#64748b', 'font-size': 16 }, 'Add an amount to see your budget flow'));
+          highlight();
+          return;
+        }
+
+        const left = 195, right = 505, nodeWidth = 14, top = 40, plotHeight = 410, gap = 48, sourceGap = 64;
+        // One common scale keeps the amount at both ends of every ribbon equal.
+        const targetGaps = Math.max(0, items.length - 1) * gap;
+        const sourceGaps = Math.max(0, sources.length - 1) * sourceGap;
+        const scale = (plotHeight - Math.max(targetGaps, sourceGaps)) / totalFlow;
+        let targetY = top + (plotHeight - totalFlow * scale - targetGaps) / 2;
+        items.forEach(item => { item.y = targetY; item.height = item.value * scale; item.offset = 0; targetY += item.height + gap; });
+        const sourceHeight = totalFlow * scale + (sources.length - 1) * sourceGap;
+        let sourceY = top + (plotHeight - sourceHeight) / 2;
+        sources.forEach(source => { source.y = sourceY; source.height = source.value * scale; sourceY += source.height + sourceGap; });
+        const linksLayer = svgElement('g', { 'aria-hidden': 'true' });
+        const nodesLayer = svgElement('g');
+        svg.append(linksLayer, nodesLayer);
+
+        sources.forEach(source => {
+          let offset = 0;
+          items.forEach(item => {
+            // When overspent, income plus the funding gap exactly equals expenses.
+            const amount = item.value * source.value / totalFlow;
+            const height = amount * scale;
+            const sy = source.y + offset, ty = item.y + item.offset;
+            const x0 = left + nodeWidth, x1 = right, middle = (x0 + x1) / 2;
+            const d = `M ${x0} ${sy} C ${middle} ${sy}, ${middle} ${ty}, ${x1} ${ty} L ${x1} ${ty + height} C ${middle} ${ty + height}, ${middle} ${sy + height}, ${x0} ${sy + height} Z`;
+            const path = svgElement('path', { d, fill: source.id === 'deficit' ? '#ef4444' : item.color, class: 'link', 'data-category': item.id, 'data-source': source.id, 'data-amount': amount });
+            interactive(path, item.id, `${source.name} → ${item.name}: ${formatCurrency(amount)}\n${details[item.id]}`);
+            linksLayer.appendChild(path);
+            offset += height;
+            item.offset += height;
+          });
+        });
+
+        function drawNode(item, source) {
+          const x = source ? left : right;
+          const labelX = source ? left - 13 : right + nodeWidth + 13;
+          const center = item.y + item.height / 2;
+          const lines = currencyLines(item.value);
+          const labelY = center - (lines.length === 2 ? 15 : 7);
+          const group = svgElement('g', { class: 'node', 'data-category': item.id, 'data-amount': item.value });
+          const hitX = source ? 10 : right - 3;
+          group.appendChild(svgElement('rect', { x: hitX, y: Math.min(item.y, center - 23), width: source ? left + nodeWidth - 7 : 322, height: Math.max(item.height, 46), rx: 4, fill: 'transparent', class: 'node-hit' }));
+          group.appendChild(svgElement('rect', { x, y: item.y, width: nodeWidth, height: item.height, rx: Math.min(3, item.height / 2), fill: item.color, class: 'node-bar' }));
+          group.appendChild(svgElement('text', { x: labelX, y: labelY, 'text-anchor': source ? 'end' : 'start', fill: '#1e293b', 'font-size': 14, 'font-weight': 650 }, item.name));
+          lines.forEach((line, index) => group.appendChild(svgElement('text', { x: labelX, y: labelY + 18 + index * 16, 'text-anchor': source ? 'end' : 'start', fill: '#64748b', 'font-size': index ? 11 : 12 }, line)));
+          interactive(group, item.id, details[item.id], true);
+          nodesLayer.appendChild(group);
+        }
+        sources.forEach(source => drawNode(source, true));
+        items.forEach(item => drawNode(item, false));
+        highlight();
+      }
+
+      elements.currCode.addEventListener('input', () => {
+        const next = elements.currCode.value.trim().toUpperCase();
+        const valid = /^[A-Z]{3,6}$/.test(next);
+        elements.currCode.setAttribute('aria-invalid', String(!valid));
+        const help = document.getElementById('codeHelp');
+        help.textContent = valid ? 'Use 3–6 letters for the currency label.' : `Enter 3–6 letters. Using ${currency.code} until corrected.`;
+        help.className = valid ? '' : 'error';
+        if (valid) { currency.code = next; renderSankey(); }
+      });
+      elements.currCode.addEventListener('blur', () => { if (elements.currCode.getAttribute('aria-invalid') !== 'true') elements.currCode.value = currency.code; });
+      elements.currRate.addEventListener('input', () => {
+        const next = elements.currRate.valueAsNumber;
+        const valid = Number.isFinite(next) && next >= 0.0001 && next <= 1000000;
+        elements.currRate.setAttribute('aria-invalid', String(!valid));
+        const help = document.getElementById('rateHelp');
+        help.textContent = valid ? 'Set manually; changes update instantly.' : `Enter a rate from 0.0001 to 1,000,000. Using ${currency.rate} until corrected.`;
+        help.className = valid ? '' : 'error';
+        if (valid) { currency.rate = next; renderSankey(); }
+      });
+      elements.currMode.addEventListener('change', () => { currency.mode = elements.currMode.value; renderSankey(); });
+      document.getElementById('resetBudget').addEventListener('click', () => {
+        fields.forEach(field => {
+          values[field.id] = field.value;
+          elements[field.id].value = field.value;
+          elements[field.id + 'Amount'].value = field.value;
+          elements[field.id + 'Amount'].removeAttribute('aria-invalid');
+          elements[field.id + 'Error'].hidden = true;
+        });
+        currency.code = elements.currCode.value = 'LBP';
+        currency.rate = 89000;
+        elements.currRate.value = '89000';
+        currency.mode = elements.currMode.value = 'dual';
+        ['currCode', 'currRate'].forEach(id => elements[id].removeAttribute('aria-invalid'));
+        document.getElementById('codeHelp').textContent = 'Use 3–6 letters for the currency label.';
+        document.getElementById('rateHelp').textContent = 'Set manually; changes update instantly.';
+        ['codeHelp', 'rateHelp'].forEach(id => document.getElementById(id).className = '');
+        selected = null;
+        renderSankey();
+      });
+      document.addEventListener('keydown', event => { if (event.key === 'Escape') { selected = null; clearHover(); } });
+      window.addEventListener('scroll', () => { elements.tooltip.hidden = true; }, true);
+      window.addEventListener('resize', () => { elements.tooltip.hidden = true; });
+      renderSankey();
+    })();
+  </script>
+</body>
+</html>
